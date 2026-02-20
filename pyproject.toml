@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asad"
-version = "0.0.1"
+version = "0.0.2"
 description = "Asad's personal data science utility library."
 authors = [
     { name="Asad Patel", email="asadnotfound404@gmail.com" }
@@ -18,4 +18,4 @@ requires-python = ">=3.8"
 dependencies = []
 
 [tool.setuptools]
-packages = ["exceptions", "logging_core"]
+packages = ["exceptions", "logging_core", "utils"]

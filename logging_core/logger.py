@@ -2,6 +2,23 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Dict, Union
+import json
+
+
+class JsonFormatter(logging.Formatter):
+    """
+    JSON formatter for structured logging.
+    Useful for cloud / monitoring systems.
+    """
+
+    def format(self, record):
+        log_record = {
+            "time": self.formatTime(record),
+            "level": record.levelname,
+            "module": record.name,
+            "message": record.getMessage(),
+        }
+        return json.dumps(log_record)
 
 
 class LoggerFactory:
@@ -15,6 +32,7 @@ class LoggerFactory:
     - Duplicate handler protection
     - Safe caching
     - UTF-8 encoding
+    - Optional JSON logging
     """
 
     _configured_loggers: Dict[str, logging.Logger] = {}
@@ -23,43 +41,15 @@ class LoggerFactory:
     def get_logger(
         name: str,
         log_dir: str = "logs",
-        log_file: str = "app.log",
+        log_file: Optional[str] = None,
         level: Optional[Union[int, str]] = None,
         max_bytes: int = 5 * 1024 * 1024,
         backup_count: int = 5,
         console: bool = True,
+        json_format: bool = False,
     ) -> logging.Logger:
-        """
-        Create or retrieve a configured logger.
 
-        Parameters
-        ----------
-        name : str
-            Logger name (usually __name__)
-        log_dir : str
-            Directory to store logs
-        log_file : str
-            Log filename
-        level : int | str, optional
-            Logging level (default: environment LOG_LEVEL or INFO)
-        max_bytes : int
-            Max size before rotation
-        backup_count : int
-            Number of backup files to retain
-        console : bool
-            Enable console logging
-
-        Returns
-        -------
-        logging.Logger
-
-        Example
-        -------
-        logger = LoggerFactory.get_logger(__name__)
-        logger = LoggerFactory.get_logger(__name__, level="DEBUG")
-        """
-
-        # Resolve level
+        # Resolve logging level
         if level is None:
             level_name = os.getenv("LOG_LEVEL", "INFO")
             level = getattr(logging, level_name.upper(), logging.INFO)
@@ -67,7 +57,7 @@ class LoggerFactory:
         if isinstance(level, str):
             level = getattr(logging, level.upper(), logging.INFO)
 
-        # Return cached logger
+        # Return cached logger if exists
         if name in LoggerFactory._configured_loggers:
             logger = LoggerFactory._configured_loggers[name]
             logger.setLevel(level)
@@ -80,12 +70,22 @@ class LoggerFactory:
         logger.propagate = False
 
         if not logger.handlers:
-            formatter = logging.Formatter(
-                "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-            )
+
+            # Default log file name per module
+            if log_file is None:
+                log_file = f"{name}.log"
 
             file_path = os.path.join(log_dir, log_file)
 
+            # Choose formatter
+            if json_format:
+                formatter = JsonFormatter()
+            else:
+                formatter = logging.Formatter(
+                    "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+                )
+
+            # File handler
             file_handler = RotatingFileHandler(
                 file_path,
                 maxBytes=max_bytes,
@@ -95,6 +95,7 @@ class LoggerFactory:
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
 
+            # Console handler
             if console:
                 console_handler = logging.StreamHandler()
                 console_handler.setFormatter(formatter)
